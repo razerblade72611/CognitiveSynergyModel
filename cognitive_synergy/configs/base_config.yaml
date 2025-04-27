@@ -13,13 +13,13 @@ device: "cuda" # Default device ('cuda' if available, otherwise 'cpu' - usually 
 #          even with the optimizations below. Consider smaller models if OOM persists.
 backbones:
   vision:
-    model_name: "facebook/dinov2-small" # Smaller ViT (~86M params)
+    model_name: "facebook/dinov2-base" # Smaller ViT (~86M params)
     pretrained: true
     # feature_layers are specified in interface_layers section
   language:
-    #model_name: "deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B" # ~1.5B params - potentially too large!
+    model_name: "deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B" # ~1.5B params - potentially too large!
     
-    model_name: "microsoft/deberta-v3-small"
+    #model_name: "microsoft/deberta-v3-base"
     pretrained: true
     # feature_layers are specified in interface_layers section
 
