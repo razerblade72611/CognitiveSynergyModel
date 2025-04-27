@@ -1,0 +1,125 @@
+# cognitive_synergy/configs/base_config.yaml
+# Base configuration for the Cognitive Synergy Model MVRP v1
+# Provides default settings that can be overridden by experiment-specific configs.
+# --- MODIFIED FOR 8GB VRAM TARGET ---
+
+# === Project Settings ===
+project_name: "cognitive_synergy_mvrp_v1"
+seed: 42 # For reproducibility across runs
+device: "cuda" # Default device ('cuda' if available, otherwise 'cpu' - usually handles ROCm too)
+
+# === Backbone Configuration ===
+# WARNING: The selected LLM (1.5B params) is likely too large for 8GB VRAM,
+#          even with the optimizations below. Consider smaller models if OOM persists.
+backbones:
+  vision:
+    model_name: "facebook/dinov2-small" # Smaller ViT (~86M params)
+    pretrained: true
+    # feature_layers are specified in interface_layers section
+  language:
+    #model_name: "deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B" # ~1.5B params - potentially too large!
+    
+    model_name: "microsoft/deberta-v3-small"
+    pretrained: true
+    # feature_layers are specified in interface_layers section
+
+# === Interface Layers ===
+# Indices of layers to extract features from for interfacing
+interface_layers:
+  #language: [4, 14, 24] # Ensure these are valid indices for the 28-layer Qwen model (0-27)
+  language: [1, 3, 6] # MODIFIED: Now 3 layers (indices must be <= 6)
+  vision: [2, 6, 10]    # Ensure these are valid indices for dinov2-small (likely 12 layers, 0-11)
+
+# === Interface Module Configuration ===
+# Settings for each BiDirectionalInterfaceModule instance
+interface_module:
+  cross_attention_hidden_dim: 768 # Internal dim for cross-attention
+  n_heads: 8                      # Number of heads for cross-attention
+  use_film: false                 # Keep FiLM disabled for simplicity/memory
+  pooling_type: "attention"       # Pooling method ('cls' or 'attention')
+  attention_pooling_heads: 1      # Number of heads if using attention pooling
+  workspace_output_dim: 256       # Output dimension PER modality PER interface, feeding into workspace
+
+# === Shared Workspace Configuration ===
+# Settings for the module that fuses interface contributions
+shared_workspace:
+  num_layers: 4                   # Number of Transformer encoder layers in the workspace
+  hidden_dim: 768                 # Internal dimension of the workspace Transformer layers
+  output_dim: 512                 # Final dimension of the 'world_state' output (bottleneck)
+  # n_heads for workspace transformer is inherited from interface_module n_heads in model init
+
+# === Contrastive Projection Head ===
+# Projects world_state and CLS tokens to a common space for contrastive loss
+contrastive_head:
+  projection_dim: 256             # Common embedding dimension for contrastive loss
+  use_projection: true            # Enable this projection head
+
+# === Loss Configuration ===
+loss:
+  type: "contrastive_alignment"   # Specifies which loss function to use
+  temperature: 0.07               # Temperature scaling for InfoNCE
+  symmetric: true                 # Use symmetric loss (v->l and l->v)
+
+# === Training Parameters ===
+training:
+  epochs: 20                      # Total number of training epochs
+  batch_size: 2                   # MODIFIED: Minimum possible per step for 8GB VRAM
+  num_workers: 7                  # Keep user value, but ensure CPU/RAM can handle this many workers
+  pin_memory: true                # Use pinned memory in DataLoader
+  drop_last_batch: false          # Whether to drop the last incomplete batch in training loader
+  gradient_accumulation_steps: 16
+   # MODIFIED: Increased to maintain effective batch size (1 * 32 = 32)
+  # --- Optimizer settings ---
+  optimizer: "adamw"              # Optimizer type: adamw, adam, sgd
+  learning_rate: 1.0e-4           # Peak learning rate
+  weight_decay: 0.01              # Weight decay (AdamW style)
+  betas: [0.9, 0.999]             # Betas for AdamW/Adam
+  eps: 1.0e-8                     # Epsilon for AdamW/Adam
+  momentum: 0.9                   # Momentum for SGD (only if optimizer='sgd')
+  # --- Scheduler settings ---
+  scheduler: "cosine"             # Scheduler type: cosine, step, multistep, or null/None
+  warmup_epochs: 2                # Number of linear warmup epochs
+  warmup_lr_init: 1.0e-6          # Initial LR for warmup
+  min_lr: 1.0e-6                  # Minimum LR for cosine decay
+  # --- Gradient Clipping ---
+  grad_clip_norm: 1.0             # Max norm for gradient clipping, null/None to disable
+  # --- Mixed Precision ---
+  use_amp: true                   # CONFIRMED: Enable Automatic Mixed Precision (needs correct trainer implementation)
+
+# === Validation Settings ===
+validation:
+  val_freq: 1                     # Run validation every N epochs
+  batch_size: 8                   # MODIFIED: Reduced validation batch size for 8GB VRAM (was 8, originally 64)
+  best_metric: "val/loss_epoch"   # Metric name used for saving best checkpoint
+  best_metric_mode: "min"         # "min" or "max" for the best metric
+
+# === Logging Settings ===
+logging:
+  log_freq: 100                   # Log training metrics every N *optimizer steps* (i.e., after N accumulation cycles)
+  log_file: null                  # Path to log file, or null/None to disable file logging
+  level: "INFO"                   # Logging level: DEBUG, INFO, WARNING, ERROR
+  use_wandb: false                # Enable Weights & Biases logging
+  wandb:                          # WandB specific configuration
+    wandb_project: "cognitive_synergy" # WandB project name
+    wandb_entity: null            # WandB entity (username or team name) - MUST BE SET by user if use_wandb=true
+    wandb_run_name: null          # Specific run name, null to auto-generate
+
+# === Checkpointing Settings ===
+checkpointing:
+  checkpoint_dir: "./checkpoints"  # Directory to save checkpoints
+  save_freq: 1                     # Save checkpoint every N epochs (less relevant when save_best_only=true, but keep > 0 for logic)
+  save_best_only: true            # MODIFIED: Now only saves when validation metric improves
+  save_last: true                  # Keep true: Always saves the checkpoint from the absolute final epoch regardless of performance
+  resume_from_checkpoint: latest   # MODIFIED: Automatically tries to load the latest epoch checkpoint on start
+
+# === Data Configuration ===
+data:
+  # Paths to processed manifest files
+  train_manifest: "/home/razerblade/My_Last_Project/Something_new/data/coco_train_manifest_processed.json"
+  val_manifest: "/home/razerblade/My_Last_Project/Something_new/data/coco_val_manifest_processed.json"
+  # Root directory containing the 'train2017' and 'val2017' image folders
+  image_root: dataset # MODIFIED: Correctly points to the dataset subdir relative to project root
+  # Text processing settings
+  max_text_length: 128            # Max sequence length for tokenizer
+  # Image processing settings
+  image_size: 224                 # Target image size
