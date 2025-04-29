@@ -118,7 +118,7 @@ data:
   train_manifest: "./data/coco_train_manifest_processed.json"
   val_manifest: "./data/coco_val_manifest_processed.json"
   # Root directory containing the 'train2017' and 'val2017' image folders
-  image_root: dataset # MODIFIED: Correctly points to the dataset subdir relative to project root
+  image_root: /content/drive/MyDrive/COCO2017 # MODIFIED: Correctly points to the dataset subdir relative to project root
   # Text processing settings
   max_text_length: 128            # Max sequence length for tokenizer
   # Image processing settings
