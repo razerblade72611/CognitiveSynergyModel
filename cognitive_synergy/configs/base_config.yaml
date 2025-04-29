@@ -1,125 +1,131 @@
 # cognitive_synergy/configs/base_config.yaml
 # Base configuration for the Cognitive Synergy Model MVRP v1
-# Provides default settings that can be overridden by experiment-specific configs.
-# --- MODIFIED FOR 8GB VRAM TARGET ---
+# --- MODIFIED FOR FREE COLAB (T4 GPU TARGET, ~15GB VRAM) ---
 
 # === Project Settings ===
 project_name: "cognitive_synergy_mvrp_v1"
 seed: 42 # For reproducibility across runs
-device: "cuda" # Default device ('cuda' if available, otherwise 'cpu' - usually handles ROCm too)
+device: "cuda" # Ensure Colab Runtime is set to GPU!
 
 # === Backbone Configuration ===
-# WARNING: The selected LLM (1.5B params) is likely too large for 8GB VRAM,
-#          even with the optimizations below. Consider smaller models if OOM persists.
 backbones:
   vision:
-    model_name: "facebook/dinov2-base" # Smaller ViT (~86M params)
+    model_name: "facebook/dinov2-base" # Reasonable size (~86M params) for T4
     pretrained: true
-    # feature_layers are specified in interface_layers section
   language:
-    model_name: "deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B" # ~1.5B params - potentially too large!
-    
-    #model_name: "microsoft/deberta-v3-base"
+    # CRITICAL CHANGE: Switched to a much smaller model (~110M params)
+    # 'deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B' (1.5B params) is too large for free Colab VRAM.
+    model_name: "bert-base-uncased"
+    # model_name: "microsoft/deberta-v3-base" # Another good alternative (~180M params)
     pretrained: true
-    # feature_layers are specified in interface_layers section
 
 # === Interface Layers ===
 # Indices of layers to extract features from for interfacing
 interface_layers:
-  #language: [4, 14, 24] # Ensure these are valid indices for the 28-layer Qwen model (0-27)
-  language: [1, 3, 6] # MODIFIED: Now 3 layers (indices must be <= 6)
-  vision: [2, 6, 10]    # Ensure these are valid indices for dinov2-small (likely 12 layers, 0-11)
+  # Indices need to be valid for the chosen models (bert-base has 12 layers, 0-11)
+  language: [3, 7, 11] # Example for 12-layer BERT
+  vision: [2, 6, 10]   # Example for 12-layer DINOv2-Base
 
 # === Interface Module Configuration ===
-# Settings for each BiDirectionalInterfaceModule instance
+# Settings for each BiDirectionalInterfaceModule instance (kept defaults)
 interface_module:
-  cross_attention_hidden_dim: 768 # Internal dim for cross-attention
-  n_heads: 8                      # Number of heads for cross-attention
-  use_film: false                 # Keep FiLM disabled for simplicity/memory
-  pooling_type: "attention"       # Pooling method ('cls' or 'attention')
-  attention_pooling_heads: 1      # Number of heads if using attention pooling
-  workspace_output_dim: 256       # Output dimension PER modality PER interface, feeding into workspace
+  cross_attention_hidden_dim: 768
+  n_heads: 8
+  use_film: false
+  pooling_type: "attention"
+  attention_pooling_heads: 1
+  workspace_output_dim: 256
 
 # === Shared Workspace Configuration ===
-# Settings for the module that fuses interface contributions
+# Settings for the module that fuses interface contributions (kept defaults)
 shared_workspace:
-  num_layers: 4                   # Number of Transformer encoder layers in the workspace
-  hidden_dim: 768                 # Internal dimension of the workspace Transformer layers
-  output_dim: 512                 # Final dimension of the 'world_state' output (bottleneck)
-  # n_heads for workspace transformer is inherited from interface_module n_heads in model init
+  num_layers: 4
+  hidden_dim: 768
+  output_dim: 512
 
 # === Contrastive Projection Head ===
-# Projects world_state and CLS tokens to a common space for contrastive loss
+# Projects world_state and CLS tokens to a common space for contrastive loss (kept defaults)
 contrastive_head:
-  projection_dim: 256             # Common embedding dimension for contrastive loss
-  use_projection: true            # Enable this projection head
+  projection_dim: 256
+  use_projection: true
 
 # === Loss Configuration ===
 loss:
-  type: "contrastive_alignment"   # Specifies which loss function to use
-  temperature: 0.07               # Temperature scaling for InfoNCE
-  symmetric: true                 # Use symmetric loss (v->l and l->v)
+  type: "contrastive_alignment"
+  temperature: 0.07
+  symmetric: true
 
 # === Training Parameters ===
 training:
-  epochs: 20                      # Total number of training epochs
-  batch_size: 2                   # MODIFIED: Minimum possible per step for 8GB VRAM
-  num_workers: 7                  # Keep user value, but ensure CPU/RAM can handle this many workers
-  pin_memory: true                # Use pinned memory in DataLoader
-  drop_last_batch: false          # Whether to drop the last incomplete batch in training loader
-  gradient_accumulation_steps: 16
-   # MODIFIED: Increased to maintain effective batch size (1 * 32 = 32)
+  epochs: 20 # Keep desired epochs, but be mindful of Colab time limits
+  # MODIFIED: Increased batch_size significantly due to smaller LLM.
+  # Adjust lower if you get Out-Of-Memory (OOM) errors. Start maybe with 8 or 16.
+  batch_size: 16 # Per-device batch size
+  # MODIFIED: Reduced workers based on Colab warnings & faster local I/O
+  num_workers: 2
+  pin_memory: true # Usually good with GPU
+  drop_last_batch: false
+  # MODIFIED: Adjusted accumulation to target effective batch size of 64 (16 * 4 = 64)
+  # Increase/decrease batch_size first, then adjust this.
+  gradient_accumulation_steps: 4
   # --- Optimizer settings ---
-  optimizer: "adamw"              # Optimizer type: adamw, adam, sgd
-  learning_rate: 1.0e-4           # Peak learning rate
-  weight_decay: 0.01              # Weight decay (AdamW style)
-  betas: [0.9, 0.999]             # Betas for AdamW/Adam
-  eps: 1.0e-8                     # Epsilon for AdamW/Adam
-  momentum: 0.9                   # Momentum for SGD (only if optimizer='sgd')
+  optimizer: "adamw"
+  learning_rate: 1.0e-4
+  weight_decay: 0.01
+  betas: [0.9, 0.999]
+  eps: 1.0e-8
+  momentum: 0.9 # Only used if optimizer='sgd'
   # --- Scheduler settings ---
-  scheduler: "cosine"             # Scheduler type: cosine, step, multistep, or null/None
-  warmup_epochs: 2                # Number of linear warmup epochs
-  warmup_lr_init: 1.0e-6          # Initial LR for warmup
-  min_lr: 1.0e-6                  # Minimum LR for cosine decay
+  scheduler: "cosine"
+  warmup_epochs: 2
+  warmup_lr_init: 1.0e-6
+  min_lr: 1.0e-6
   # --- Gradient Clipping ---
-  grad_clip_norm: 1.0             # Max norm for gradient clipping, null/None to disable
+  grad_clip_norm: 1.0
   # --- Mixed Precision ---
-  use_amp: true                   # CONFIRMED: Enable Automatic Mixed Precision (needs correct trainer implementation)
+  use_amp: true # Keep true for T4 performance/memory
 
 # === Validation Settings ===
 validation:
-  val_freq: 1                     # Run validation every N epochs
-  batch_size: 8                   # MODIFIED: Reduced validation batch size for 8GB VRAM (was 8, originally 64)
-  best_metric: "val/loss_epoch"   # Metric name used for saving best checkpoint
-  best_metric_mode: "min"         # "min" or "max" for the best metric
+  # MODIFIED: Validate less often to save time if validation is slow
+  val_freq: 2
+  # MODIFIED: Increased validation batch size (adjust if OOM)
+  batch_size: 32
+  best_metric: "val/loss_epoch"
+  best_metric_mode: "min"
 
 # === Logging Settings ===
 logging:
-  log_freq: 100                   # Log training metrics every N *optimizer steps* (i.e., after N accumulation cycles)
-  log_file: null                  # Path to log file, or null/None to disable file logging
-  level: "INFO"                   # Logging level: DEBUG, INFO, WARNING, ERROR
-  use_wandb: false                # Enable Weights & Biases logging
-  wandb:                          # WandB specific configuration
-    wandb_project: "cognitive_synergy" # WandB project name
-    wandb_entity: null            # WandB entity (username or team name) - MUST BE SET by user if use_wandb=true
-    wandb_run_name: null          # Specific run name, null to auto-generate
+  # MODIFIED: Log less frequently if training is faster
+  log_freq: 200 # Log every N *optimizer steps*
+  log_file: null
+  level: "INFO"
+  use_wandb: false # Keep false for simplicity unless you use WandB
+  wandb:
+    wandb_project: "cognitive_synergy"
+    wandb_entity: null
+    wandb_run_name: null
 
 # === Checkpointing Settings ===
 checkpointing:
-  checkpoint_dir: "./checkpoints"  # Directory to save checkpoints
-  save_freq: 1                     # Save checkpoint every N epochs (less relevant when save_best_only=true, but keep > 0 for logic)
-  save_best_only: true            # MODIFIED: Now only saves when validation metric improves
-  save_last: true                  # Keep true: Always saves the checkpoint from the absolute final epoch regardless of performance
-  resume_from_checkpoint: latest   # MODIFIED: Automatically tries to load the latest epoch checkpoint on start
+  checkpoint_dir: "./checkpoints" # Saves to local Colab storage
+  save_freq: 1 # Still relevant for 'save_last'
+  save_best_only: true
+  save_last: true
+  resume_from_checkpoint: latest
 
 # === Data Configuration ===
 data:
-  # Paths to processed manifest files
+  # Paths to processed manifest files (relative to project root)
   train_manifest: "./data/coco_train_manifest_processed.json"
   val_manifest: "./data/coco_val_manifest_processed.json"
-  # Root directory containing the 'train2017' and 'val2017' image folders
+
+  # CRITICAL FOR SPEED: Assumes you COPY data from Drive to local Colab storage first!
+  # Example copy command: !cp -r /content/drive/MyDrive/COCO2017 /content/COCO2017_local
   image_root: /content/drive/MyDrive/COCO2017 # MODIFIED: Correctly points to the dataset subdir relative to project root
+  # If using Drive directly (slower): image_root: /content/drive/MyDrive/COCO2017
+
   # Text processing settings
-  max_text_length: 128            # Max sequence length for tokenizer
+  max_text_length: 128
   # Image processing settings
-  image_size: 224                 # Target image size
+  image_size: 224
