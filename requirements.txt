@@ -1,24 +1,25 @@
 # cognitive_synergy/requirements.txt
 # Python package dependencies for the Cognitive Synergy Model project
 # Use pip install -r requirements.txt to install
-# --- Modified for Google Colab Compatibility (Prefers Colab's newer Torch/Torchvision) ---
+# --- Final Version (April 28, 2025) - Optimized for Google Colab Compatibility ---
+# Changes made to resolve dependency conflicts observed in the Colab environment.
 
 # Core ML Libraries
-# Allow newer torch versions compatible with Colab's pre-installed libraries (often >=2.0)
-# Check Colab's specific pre-installed versions via !pip show torch torchvision if needed
-torch>=2.0.0            # Adjusted to allow versions compatible with recent torchvision
-torchvision>=0.15.1      # Adjusted lower bound, allows Colab's default (e.g., 0.21.0)
-# torchaudio>=0.10.0     # Uncomment if needed for audio tasks later (check compatibility)
+# Adjusted to use versions compatible with typical Colab pre-installed packages.
+# Colab often has torch>=2.0. Check specific versions via !pip show torch torchvision if needed.
+torch>=2.0.0              # Allows newer versions compatible with Colab defaults & torchvision
+torchvision>=0.15.1          # Allows newer versions compatible with modern torch
+# torchaudio>=0.10.0         # Uncomment if needed for audio tasks later (check compatibility)
 
 # Model Backbones & Tokenizers
-timm>=0.6.12,<0.7.0        # For ViT models (PyTorch Image Models) - Check latest stable version
-transformers>=4.20.0,<5.0.0 # For BERT models and tokenizers (Hugging Face) - Check latest stable version
+timm>=0.6.12,<0.7.0        # Kept specific range assuming project requires <0.7.0. Relax upper bound if not needed.
+transformers>=4.20.0,<5.0.0 # Kept specific range assuming project requires <5.0.0. Relax upper bound if not needed.
 
 # Configuration & Utilities
 PyYAML>=6.0,<7.0            # For loading YAML configuration files
 tqdm>=4.60.0,<5.0.0          # For progress bars
-numpy>=1.20.0,<2.0.0         # Fundamental package for numerical operations
-Pillow>=9.0.0,<10.0.0        # For image loading (PIL fork)
+numpy>=2.0.0               # MODIFIED: Allows numpy 2.x, resolving conflict with Colab's 'thinc' package.
+Pillow>=10.1               # MODIFIED: Allows Pillow >=10.1, resolving conflict with Colab's 'scikit-image'.
 
 # Experiment Tracking (Optional)
 # wandb>=0.12.0,<0.16.0     # Uncomment if using Weights & Biases - Check latest stable version
