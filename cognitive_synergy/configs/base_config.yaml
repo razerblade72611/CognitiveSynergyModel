@@ -115,8 +115,8 @@ checkpointing:
 # === Data Configuration ===
 data:
   # Paths to processed manifest files
-  train_manifest: "/home/razerblade/My_Last_Project/Something_new/data/coco_train_manifest_processed.json"
-  val_manifest: "/home/razerblade/My_Last_Project/Something_new/data/coco_val_manifest_processed.json"
+  train_manifest: "/content/CognitiveSynergyModel/data/coco_train_manifest_processed.json"
+  val_manifest: "/content/CognitiveSynergyModel/data/coco_val_manifest_processed.json"
   # Root directory containing the 'train2017' and 'val2017' image folders
   image_root: dataset # MODIFIED: Correctly points to the dataset subdir relative to project root
   # Text processing settings
