@@ -12,7 +12,7 @@ torchvision>=0.15.1          # Allows newer versions compatible with modern torc
 # torchaudio>=0.10.0         # Uncomment if needed for audio tasks later (check compatibility)
 
 # Model Backbones & Tokenizers
-timm>=0.6.12,<0.7.0        # Kept specific range assuming project requires <0.7.0. Relax upper bound if not needed.
+timm>=0.6.12        # Kept specific range assuming project requires <0.7.0. Relax upper bound if not needed.
 transformers>=4.20.0,<5.0.0 # Kept specific range assuming project requires <5.0.0. Relax upper bound if not needed.
 
 # Configuration & Utilities
